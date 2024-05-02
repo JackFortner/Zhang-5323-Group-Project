@@ -1,0 +1,100 @@
+import streamlit as st
+import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import StandardScaler
+import matplotlib.pyplot as plt
+
+# Helper function to safely convert input to float
+def to_float(input_str):
+    try:
+        return float(input_str)
+    except ValueError:
+        return None  # Returns None to indicate invalid input
+
+# Load and prepare the dataset
+@st.cache_data
+def load_data():
+    data = pd.read_csv("C:\\Users\\jacks\\OneDrive - University of Arkansas\\Zhang Group Project\\Zhang Group Project copy.csv")
+    X = data[['Debt_to_Equity', 'Net_Profit_Margin', 'Return_on_Assets', 'Current_Ratio', 'Quick_Ratio', 
+              'Interest_Coverage', 'Inventory_Turnover', 'Asset_Turnover', 'FCF_Margin', 'OCF_Margin']]
+    y = data['SP_Rating']
+    return X, y
+
+X, y = load_data()
+
+# Standardize the features
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+# Create and train the model
+model = RandomForestClassifier(n_estimators=100, random_state=42)
+model.fit(X_scaled, y)
+
+# Streamlit user interface for input
+st.title('Credit Rating Prediction Tool')
+
+# Collecting inputs using text_input and converting them to floats
+inputs = {}
+inputs['Debt_to_Equity'] = to_float(st.text_input("Debt to Equity Ratio (decimal form, e.g., 0.5)"))
+inputs['Net_Profit_Margin'] = to_float(st.text_input("Net Profit Margin (decimal form, e.g., 0.15)"))
+inputs['Return_on_Assets'] = to_float(st.text_input("Return on Assets (decimal form, e.g., 0.1)"))
+inputs['Current_Ratio'] = to_float(st.text_input("Current Ratio (e.g., 1.5)"))
+inputs['Quick_Ratio'] = to_float(st.text_input("Quick Ratio (e.g., 1.0)"))
+inputs['Interest_Coverage'] = to_float(st.text_input("Interest Coverage Ratio (e.g., 3.0)"))
+inputs['Inventory_Turnover'] = to_float(st.text_input("Inventory Turnover Ratio (e.g., 5)"))
+inputs['Asset_Turnover'] = to_float(st.text_input("Asset Turnover Ratio (e.g., 0.8)"))
+inputs['FCF_Margin'] = to_float(st.text_input("FCF Margin (decimal form, e.g., 0.05)"))
+inputs['OCF_Margin'] = to_float(st.text_input("OCF Margin (decimal form, e.g., 0.12)"))
+
+# Check if all inputs are valid before proceeding
+if st.button('Predict Credit Rating'):
+    if all(inputs.values()):  # Checking if all entries are valid (not None)
+        # Convert input to DataFrame
+        input_df = pd.DataFrame([inputs])
+        
+        # Scale the inputs
+        input_scaled = scaler.transform(input_df)
+        
+        # Predict the credit rating
+        prediction = model.predict(input_scaled)
+        st.success(f'Predicted S&P Global Credit Rating: {prediction[0]}')
+
+        # Separate graphs for each category
+        categories = {
+            'Profitability': ['Net_Profit_Margin', 'Return_on_Assets'],
+            'Liquidity': ['Current_Ratio', 'Quick_Ratio'],
+            'Leverage': ['Debt_to_Equity', 'Interest_Coverage'],
+            'Efficiency': ['Inventory_Turnover', 'Asset_Turnover'],
+            'Cash Flow': ['FCF_Margin', 'OCF_Margin']
+        }
+
+        for category, metrics in categories.items():
+            fig, ax = plt.subplots(figsize=(6, 2))
+            ax.barh(metrics, [input_df.loc[0, metric] for metric in metrics], color='skyblue')
+            plt.xlabel('Metric Value')
+            plt.title(f'{category} Metrics')
+            st.pyplot(fig)
+
+        # Generate a report based on the credit rating
+        credit_rating_report = {
+            'AAA': "An 'AAA' rating indicates extremely strong capacity to meet financial commitments. It is the highest rating.",
+            'AA+': "An 'AA' rating indicates a very strong capacity to meet financial commitments.",
+            'AA': "An 'AA' rating indicates a very strong capacity to meet financial commitments.",
+            'AA-':"An 'AA-' rating indicates a very strong capacity to meet financial commitments.", 
+            'A+': "An 'A+' rating indicates a strong ability to meet financial commitments but somewhat susceptible to adverse economic conditions and changes in circumstance.",
+            'A': "An 'A' rating rating indicates a strong ability to meet financial commitments but somewhat susceptible to adverse economic conditions and changes in circumstance.",
+            'A-': " An 'A-' rating rating indicates a strong ability to meet financial commitments but somewhat susceptible to adverse economic conditions and changes in circumstance.",
+            'BBB+': "A 'BBB+' rating indicates adequate capacity to meet financial commitments, but more subject to adverse economic conditions.",
+            'BBB': "A 'BBB' rating indicates adequate capacity to meet financial commitments, but more subject to adverse economic conditions.",
+            'BBB-': "A 'BBB-' rating is considered the lowest investment grade by market participants.",
+            'BB+': "A BB+ rating is considered the highest speculative grade by market participants",
+            'BB': "A 'BB' rating is considered less vulnerable in the near-term but faces major ongoing uncertainties to adverse business, financial and economic conditions.",
+            'BB-': " A 'BB-' rating is considered less vulnerable in the near-term but faces major ongoing uncertainties to adverse business, financial and economic conditions.",
+            'B': "A 'B' rating is More vulnerable to adverse business, financial and economic conditions but currently has the capacity to meet financial commitments."
+        }
+        
+        report = credit_rating_report.get(prediction[0], "No specific information available for this rating.")
+        st.subheader("Credit Rating Report")
+        st.write(report)
+    else:
+        st.error("Please enter valid numbers for all input fields.")
